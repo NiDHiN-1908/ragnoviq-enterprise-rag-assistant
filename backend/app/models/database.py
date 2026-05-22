@@ -125,4 +125,4 @@ class SystemLog(Base):
     message = Column(Text, nullable=False)
     module = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
-    metadata = Column(Text, nullable=True)  # JSON string
+    log_metadata = Column(Text, nullable=True)  # JSON string
