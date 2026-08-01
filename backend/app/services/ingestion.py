@@ -44,26 +44,44 @@ class IngestionPipeline:
         """
         db = SessionLocal()
         try:
-            # Check if website already exists
             existing = WebsiteRepository.get_by_url(db, website_url)
             if existing:
-                logger.warning(f"Website already exists: {website_url}")
-                return existing.id
+                if existing.status in ["pending", "failed"]:
+                    website = existing
+                else:
+                    logger.info(f"Website already indexed: {website_url}")
+                    return existing.id
+            else:
+                website = WebsiteRepository.create(
+                    db, url=website_url, title=website_title
+                )
+                logger.info(f"Created website record: {website.id}")
 
-            # Create website record
-            website = WebsiteRepository.create(
-                db, url=website_url, title=website_title
-            )
-            logger.info(f"Created website record: {website.id}")
-
-            # Execute pipeline steps
-            self._execute_pipeline(db, website.id, website_url)
-
+            self._execute_pipeline(db, website.id, website.url)
             return website.id
 
         except Exception as e:
             logger.error(f"Error in ingestion pipeline: {str(e)}")
             raise
+        finally:
+            db.close()
+
+    def process_website_by_id(self, website_id: str) -> None:
+        """
+        Execute ingestion pipeline directly for an existing website ID.
+        Prevents race condition when record is pre-created by API handler.
+        """
+        db = SessionLocal()
+        try:
+            website = WebsiteRepository.get_by_id(db, website_id)
+            if not website:
+                logger.error(f"Website record not found: {website_id}")
+                return
+
+            self._execute_pipeline(db, website.id, website.url)
+        except Exception as e:
+            logger.error(f"Error executing pipeline for website {website_id}: {str(e)}")
+            WebsiteRepository.update_status(db, website_id, "failed")
         finally:
             db.close()
 

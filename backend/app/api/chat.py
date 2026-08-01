@@ -21,6 +21,8 @@ llm_generator = LLMGenerator()
 retriever = RAGRetriever()
 
 
+from app.models.database import ChatMessage as ChatMessageModel
+
 @router.post("/query", response_model=ChatResponse)
 async def chat(query: ChatMessage, db: Session = Depends(get_db)):
     """
@@ -41,23 +43,23 @@ async def chat(query: ChatMessage, db: Session = Depends(get_db)):
 
         start_time = time.time()
 
-        # Retrieve relevant context
+        # Retrieve relevant context (support full website list or single website filter)
         context = retriever.retrieve_context(
             query=query.question,
-            website_id=query.use_websites[0] if query.use_websites else None,
+            website_id=query.use_websites if query.use_websites else None,
             top_k=5,
         )
 
-        # Get conversation history (optional)
+        # Get conversation history with user and assistant turns for multi-turn context
         history = []
         if query.session_id:
             history_msgs = ChatMessageRepository.get_by_session(
                 db, query.session_id, limit=5
             )
-            history = [
-                {"role": "user", "content": msg.user_message}
-                for msg in reversed(history_msgs)
-            ]
+            for msg in reversed(history_msgs):
+                history.append({"role": "user", "content": msg.user_message})
+                if msg.assistant_response:
+                    history.append({"role": "assistant", "content": msg.assistant_response})
 
         # Generate response
         response_text, tokens_used, generation_time = llm_generator.generate_response(
@@ -68,7 +70,7 @@ async def chat(query: ChatMessage, db: Session = Depends(get_db)):
 
         response_time = time.time() - start_time
 
-        # Store in chat history
+        # Store in chat history DB
         ChatMessageRepository.create(
             db,
             session_id=session_id,
@@ -88,9 +90,9 @@ async def chat(query: ChatMessage, db: Session = Depends(get_db)):
         # Format sources
         sources = [
             {
-                "title": item["page_title"] or "Untitled",
-                "url": item["page_url"],
-                "relevance": item["similarity_score"],
+                "title": item.get("page_title") or "Untitled Source",
+                "url": item.get("page_url") or "",
+                "relevance": float(item.get("similarity_score", 0.0)),
             }
             for item in context
         ]
@@ -144,10 +146,13 @@ async def get_chat_history(session_id: str, db: Session = Depends(get_db)):
 async def clear_session(session_id: str, db: Session = Depends(get_db)):
     """Clear chat history for a session."""
     try:
-        # In production, delete old messages
-        logger.info(f"Cleared session: {session_id}")
-        return {"message": "Session cleared"}
+        deleted_count = db.query(ChatMessageModel).filter(ChatMessageModel.session_id == session_id).delete()
+        db.commit()
+        logger.info(f"Cleared session {session_id} ({deleted_count} messages deleted)")
+        return {"message": "Session cleared successfully", "session_id": session_id, "deleted_count": deleted_count}
 
     except Exception as e:
+        db.rollback()
         logger.error(f"Error clearing session: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to clear session")
+

@@ -37,6 +37,10 @@ def get_db() -> Session:
 def init_db() -> None:
     """Initialize database tables."""
     try:
+        if "sqlite" in settings.database_url:
+            from pathlib import Path
+            db_path = settings.database_url.replace("sqlite:///", "")
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables initialized successfully")
     except Exception as e:

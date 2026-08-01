@@ -32,28 +32,29 @@ async def ingest_website(
     """
     try:
         # Check if URL already exists
-        existing = WebsiteRepository.get_by_url(db, str(website.url))
+        url_str = str(website.url)
+        existing = WebsiteRepository.get_by_url(db, url_str)
         if existing:
             if existing.status == "indexed":
                 raise HTTPException(
                     status_code=409,
-                    detail="Website already indexed. Use PUT to re-index.",
+                    detail="Website already indexed.",
                 )
-            return existing
+            target_website = existing
+        else:
+            # Create website record
+            target_website = WebsiteRepository.create(
+                db, url=url_str, title=website.title
+            )
 
-        # Add to background tasks
+        # Queue ingestion pipeline by website ID to prevent duplicate lookup race conditions
         background_tasks.add_task(
-            pipeline.ingest_website, str(website.url), website.title
+            pipeline.process_website_by_id, target_website.id
         )
 
-        # Create and return website record
-        new_website = WebsiteRepository.create(
-            db, url=str(website.url), title=website.title
-        )
+        logger.info(f"Submitted website for indexing: {target_website.id}")
 
-        logger.info(f"Submitted website for indexing: {new_website.id}")
-
-        return new_website
+        return target_website
 
     except HTTPException:
         raise

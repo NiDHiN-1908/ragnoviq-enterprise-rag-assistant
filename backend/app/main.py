@@ -16,11 +16,24 @@ from app.api import ingestion, chat, system
 logger = setup_logging()
 settings = get_settings()
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    logger.info("Starting RAGNoviq application")
+    init_db()
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"LLM Provider: {settings.llm_provider}")
+    yield
+    logger.info("Shutting down RAGNoviq application")
+
 # Create app
 app = FastAPI(
     title="RAGNoviq",
     description="Enterprise RAG Website Knowledge Assistant",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -47,23 +60,6 @@ async def general_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "Internal server error"},
     )
-
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize on startup."""
-    logger.info("Starting RAGNoviq application")
-    init_db()
-    logger.info(f"Environment: {settings.environment}")
-    logger.info(f"LLM Provider: {settings.llm_provider}")
-
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    logger.info("Shutting down RAGNoviq application")
 
 
 # Root endpoint

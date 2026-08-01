@@ -19,9 +19,9 @@ class Settings(BaseSettings):
 
     # LLM Configuration
     groq_api_key: Optional[str] = None
-    groq_model: str = "mixtral-8x7b-32768"
+    groq_model: str = "llama-3.3-70b-versatile"
     google_api_key: Optional[str] = None
-    gemini_model: str = "gemini-pro"
+    gemini_model: str = "gemini-1.5-flash"
     llm_provider: str = "groq"  # groq or gemini
 
     # Embeddings Configuration

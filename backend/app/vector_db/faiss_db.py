@@ -80,6 +80,7 @@ class FAISSVectorDB:
                 vector_id = str(start_id + i)
                 meta["vector_id"] = vector_id
                 meta["website_id"] = website_id
+                meta["_vector"] = vectors[i].tolist()
                 self.metadata[vector_id] = meta
                 vector_ids.append(vector_id)
 
@@ -110,10 +111,12 @@ class FAISSVectorDB:
                 return []
 
             query_vector = np.array([query_vector], dtype=np.float32)
-            distances, indices = self.index.search(query_vector, min(top_k * 2, self.index.ntotal))
+            distances, indices = self.index.search(query_vector, min(top_k * 4, self.index.ntotal))
 
             results = []
             for idx, distance in zip(indices[0], distances[0]):
+                if idx < 0:
+                    continue
                 vector_id = str(idx)
                 if vector_id not in self.metadata:
                     continue
@@ -124,10 +127,11 @@ class FAISSVectorDB:
                 if website_id and meta.get("website_id") != website_id:
                     continue
 
-                # Convert L2 distance to similarity
-                similarity = 1 / (1 + distance)
+                # Convert L2 distance to similarity score in [0, 1]
+                similarity = float(1 / (1 + distance))
+                clean_meta = {k: v for k, v in meta.items() if k != "_vector"}
                 
-                results.append((vector_id, similarity, meta))
+                results.append((vector_id, similarity, clean_meta))
 
                 if len(results) >= top_k:
                     break
@@ -140,8 +144,7 @@ class FAISSVectorDB:
 
     def delete_vectors(self, website_id: str) -> int:
         """
-        Delete all vectors for a website.
-        Currently rebuilds index (FAISS doesn't support deletion).
+        Delete all vectors for a website and rebuild index cleanly.
         
         Args:
             website_id: Website ID to delete
@@ -163,32 +166,28 @@ class FAISSVectorDB:
             for vid in ids_to_delete:
                 del self.metadata[vid]
 
-            # Rebuild index (FAISS doesn't support deletion)
-            if self.index.ntotal > 0:
-                # Create new index and re-add kept vectors
-                old_index = self.index
-                self._create_new_index()
+            # Rebuild index with remaining vectors
+            remaining_vids = list(self.metadata.keys())
+            self.index = faiss.IndexFlatL2(self.dimension)
+            new_metadata = {}
 
-                # Rebuild with remaining vectors
-                remaining_vids = list(self.metadata.keys())
-                if remaining_vids:
-                    # Re-number vector IDs
-                    new_metadata = {}
-                    vectors_to_add = []
+            if remaining_vids:
+                remaining_vectors = []
+                for new_id, old_vid in enumerate(remaining_vids):
+                    meta = self.metadata[old_vid]
+                    vec = meta.get("_vector")
+                    if vec:
+                        remaining_vectors.append(vec)
+                    meta["vector_id"] = str(new_id)
+                    new_metadata[str(new_id)] = meta
 
-                    for new_id, old_vid in enumerate(remaining_vids):
-                        meta = self.metadata[old_vid]
-                        meta["vector_id"] = str(new_id)
-                        new_metadata[str(new_id)] = meta
+                if remaining_vectors:
+                    vec_array = np.array(remaining_vectors, dtype=np.float32)
+                    self.index.add(vec_array)
 
-                        # Get vector from old index (approximate)
-                        # Note: This is a limitation - we store vector content if needed
-
-                    # For now, just clear and require re-indexing
-                    self.metadata = new_metadata
-
+            self.metadata = new_metadata
             self._save_index()
-            logger.info(f"Deleted {len(ids_to_delete)} vectors")
+            logger.info(f"Deleted {len(ids_to_delete)} vectors for website {website_id}. Rebuilt FAISS index with {self.index.ntotal} vectors.")
             return len(ids_to_delete)
 
         except Exception as e:
