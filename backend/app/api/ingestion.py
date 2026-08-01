@@ -31,17 +31,22 @@ async def ingest_website(
         Website record with status 'pending' or 'indexing'
     """
     try:
-        # Check if URL already exists
-        url_str = str(website.url)
+        url_str = str(website.url).strip().rstrip("/")
         existing = WebsiteRepository.get_by_url(db, url_str)
         if existing:
-            # Reset status to pending for re-indexing
             target_website = WebsiteRepository.update_status(db, existing.id, "pending")
         else:
-            # Create website record
-            target_website = WebsiteRepository.create(
-                db, url=url_str, title=website.title
-            )
+            try:
+                target_website = WebsiteRepository.create(
+                    db, url=url_str, title=website.title
+                )
+            except Exception:
+                db.rollback()
+                existing = WebsiteRepository.get_by_url(db, url_str)
+                if existing:
+                    target_website = WebsiteRepository.update_status(db, existing.id, "pending")
+                else:
+                    raise
 
         # Queue background processing
         background_tasks.add_task(
@@ -56,7 +61,7 @@ async def ingest_website(
         raise
     except Exception as e:
         logger.error(f"Error submitting website: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to submit website")
+        raise HTTPException(status_code=500, detail=f"Failed to submit website: {str(e)}")
 
 
 @router.get("/status/{website_id}", response_model=IngestionStatus)

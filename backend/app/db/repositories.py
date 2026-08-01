@@ -37,8 +37,11 @@ class WebsiteRepository:
 
     @staticmethod
     def get_by_url(db: Session, url: str) -> Optional[Website]:
-        """Get website by URL."""
-        return db.query(Website).filter(Website.url == url).first()
+        """Get website by URL (trailing-slash tolerant)."""
+        clean_url = url.strip().rstrip("/")
+        return db.query(Website).filter(
+            (Website.url == clean_url) | (Website.url == clean_url + "/")
+        ).first()
 
     @staticmethod
     def get_all(db: Session) -> List[Website]:
