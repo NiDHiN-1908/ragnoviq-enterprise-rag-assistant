@@ -234,6 +234,14 @@ def test_system_status_endpoint():
     assert "system" in data
 
 
+def test_list_websites_endpoint():
+    res = client.get("/api/v1/ingest/websites")
+    assert res.status_code == 200
+    data = res.json()
+    assert "websites" in data
+    assert "total" in data
+
+
 def test_sources_endpoint():
     res = client.get("/api/v1/sources")
     assert res.status_code == 200

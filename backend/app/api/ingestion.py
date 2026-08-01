@@ -125,10 +125,13 @@ async def list_websites(db: Session = Depends(get_db)):
                 {
                     "id": w.id,
                     "url": w.url,
-                    "title": w.title,
-                    "status": w.status,
-                    "pages": w.total_pages,
-                    "chunks": w.total_chunks,
+                    "title": w.title or w.url,
+                    "status": w.status or "pending",
+                    "pages": w.total_pages or 0,
+                    "chunks": w.total_chunks or 0,
+                    "total_pages": w.total_pages or 0,
+                    "total_chunks": w.total_chunks or 0,
+                    "last_crawled": w.last_crawled,
                     "created_at": w.created_at,
                 }
                 for w in websites

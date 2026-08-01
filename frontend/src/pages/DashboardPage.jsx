@@ -22,7 +22,10 @@ export default function DashboardPage() {
       setWebsites(response.data.websites || []);
       setError(null);
     } catch (err) {
-      setError('Failed to load websites');
+      const errorMsg = (err.code === 'ERR_NETWORK' || !err.response)
+        ? 'Backend API is offline. Make sure to run backend server at http://localhost:8000.'
+        : 'Failed to load websites';
+      setError(errorMsg);
       console.error(err);
     } finally {
       setLoading(false);

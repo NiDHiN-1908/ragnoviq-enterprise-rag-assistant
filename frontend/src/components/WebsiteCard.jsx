@@ -53,11 +53,11 @@ export default function WebsiteCard({ website, onDelete }) {
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
           <p className="text-gray-400">Pages</p>
-          <p className="text-lg font-semibold">{website.pages}</p>
+          <p className="text-lg font-semibold">{website.pages ?? website.total_pages ?? 0}</p>
         </div>
         <div>
           <p className="text-gray-400">Chunks</p>
-          <p className="text-lg font-semibold">{website.chunks}</p>
+          <p className="text-lg font-semibold">{website.chunks ?? website.total_chunks ?? 0}</p>
         </div>
       </div>
 
