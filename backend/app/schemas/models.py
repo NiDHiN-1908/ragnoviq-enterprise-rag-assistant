@@ -63,6 +63,8 @@ class ChatMessage(BaseModel):
 
 class ChatResponse(BaseModel):
     """Schema for chat response."""
+    model_config = {"protected_namespaces": ()}
+    
     answer: str = Field(..., description="AI-generated answer")
     sources: List[dict] = Field(default=[], description="Source references")
     session_id: str = Field(..., description="Chat session ID")

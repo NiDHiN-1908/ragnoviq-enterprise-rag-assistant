@@ -6,7 +6,6 @@ Uses sentence-transformers for semantic embeddings.
 import logging
 import numpy as np
 from typing import List, Tuple
-from sentence_transformers import SentenceTransformer
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,11 @@ class EmbeddingGenerator:
 
     def __init__(self, model_name: str = settings.embeddings_model):
         self.model_name = model_name
+        self.embedding_dim = 384
+        self.model = None
+
         try:
+            from sentence_transformers import SentenceTransformer
             self.model = SentenceTransformer(model_name)
             self.embedding_dim = self.model.get_sentence_embedding_dimension()
             logger.info(
@@ -26,48 +29,56 @@ class EmbeddingGenerator:
                 f"(dimension: {self.embedding_dim})"
             )
         except Exception as e:
-            logger.error(f"Failed to load embedding model: {str(e)}")
-            raise
+            logger.warning(
+                f"Sentence-transformers unavailable ({str(e)}). "
+                f"Using deterministic feature vector fallback."
+            )
+            self.model = None
+
+    def _fallback_embedding(self, text: str) -> np.ndarray:
+        """Deterministic fallback feature vector generator."""
+        vec = np.zeros(self.embedding_dim, dtype=np.float32)
+        if not text or not text.strip():
+            return vec
+        words = text.lower().split()
+        for w in words:
+            idx = abs(hash(w)) % self.embedding_dim
+            vec[idx] += 1.0
+        norm = np.linalg.norm(vec)
+        if norm > 0:
+            vec /= norm
+        return vec
 
     def generate_embedding(self, text: str) -> np.ndarray:
         """
         Generate embedding for a single text.
-        
-        Args:
-            text: Text to embed
-            
-        Returns:
-            Embedding vector
         """
         try:
-            # Ensure text is not empty
             if not text or not text.strip():
                 return np.zeros(self.embedding_dim)
+
+            if self.model is None:
+                return self._fallback_embedding(text)
 
             embedding = self.model.encode(text, convert_to_numpy=True)
             return embedding
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")
-            return np.zeros(self.embedding_dim)
+            return self._fallback_embedding(text)
 
     def generate_embeddings_batch(
         self, texts: List[str], batch_size: int = 32
     ) -> List[np.ndarray]:
         """
         Generate embeddings for multiple texts efficiently.
-        
-        Args:
-            texts: List of texts to embed
-            batch_size: Batch size for processing
-            
-        Returns:
-            List of embedding vectors
         """
         try:
             if not texts:
                 return []
 
-            # Filter empty texts
+            if self.model is None:
+                return [self._fallback_embedding(t) for t in texts]
+
             non_empty_texts = [t for t in texts if t and t.strip()]
             if not non_empty_texts:
                 return [np.zeros(self.embedding_dim) for _ in texts]

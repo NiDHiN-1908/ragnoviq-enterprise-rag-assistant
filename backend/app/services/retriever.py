@@ -35,7 +35,7 @@ class RAGRetriever:
     def retrieve_context(
         self,
         query: str,
-        website_id: Optional Union[str, List[str]] = None,
+        website_id: Optional[Union[str, List[str]]] = None,
         top_k: Optional[int] = None,
     ) -> List[dict]:
         """
