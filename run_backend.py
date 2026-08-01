@@ -57,18 +57,28 @@ def run():
     print("🚀 Launching RAGNoviq FastAPI Backend Server...")
     print("=" * 60)
     
-    ports_to_try = [8000, 8001, 8002, 8080]
-    hosts_to_try = ["127.0.0.1", "0.0.0.0"]
+    # Check if cloud platform specified PORT environment variable (e.g. Render, Railway)
+    env_port = os.environ.get("PORT")
+    if env_port:
+        port = int(env_port)
+        print(f"✅ Cloud environment PORT={port} detected. Binding to http://0.0.0.0:{port}")
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+        return
 
-    for port in ports_to_try:
-        free_port(port)
-        for host in hosts_to_try:
+    # Local environment binding
+    hosts_to_try = ["0.0.0.0", "127.0.0.1"]
+    ports_to_try = [8000, 8001, 8002, 8080]
+
+    for host in hosts_to_try:
+        for port in ports_to_try:
+            free_port(port)
             if is_port_free(host, port):
                 print(f"✅ Found available port! Binding to http://{host}:{port}")
                 uvicorn.run(app, host=host, port=port, log_level="info")
                 return
 
-    print("❌ Could not bind to any port in [8000, 8001, 8002, 8080].")
+    # Fallback launch
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
 
 if __name__ == "__main__":

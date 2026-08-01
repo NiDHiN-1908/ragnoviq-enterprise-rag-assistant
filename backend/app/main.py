@@ -63,9 +63,9 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # Root endpoint
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
-    """Root endpoint."""
+    """Root endpoint for health checks."""
     return {
         "name": "RAGNoviq",
         "description": "Enterprise RAG Website Knowledge Assistant",
