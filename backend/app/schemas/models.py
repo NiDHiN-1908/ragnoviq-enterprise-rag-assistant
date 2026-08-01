@@ -31,12 +31,12 @@ class WebsiteResponse(BaseModel):
     """Schema for website response."""
     id: str
     url: str
-    title: Optional[str]
-    status: str
-    total_pages: int
-    total_chunks: int
-    last_crawled: Optional[datetime]
-    created_at: datetime
+    title: Optional[str] = None
+    status: str = "pending"
+    total_pages: int = 0
+    total_chunks: int = 0
+    last_crawled: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
         from_attributes = True

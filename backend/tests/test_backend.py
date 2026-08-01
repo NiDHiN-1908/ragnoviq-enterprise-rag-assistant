@@ -267,6 +267,8 @@ def test_ingest_website_normalization_and_reindex():
     assert res.status_code == 202
     data = res.json()
     assert data["url"] == "https://example.com"
+    assert data["total_pages"] == 0
+    assert data["total_chunks"] == 0
 
     # Test re-submitting same website
     re_res = client.post("/api/v1/ingest/website", json={

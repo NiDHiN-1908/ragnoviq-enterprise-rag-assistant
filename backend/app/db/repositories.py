@@ -18,7 +18,13 @@ class WebsiteRepository:
     @staticmethod
     def create(db: Session, url: str, title: Optional[str] = None) -> Website:
         """Create a new website record."""
-        website = Website(url=url, title=title, status="pending")
+        website = Website(
+            url=url,
+            title=title or url,
+            status="pending",
+            total_pages=0,
+            total_chunks=0,
+        )
         db.add(website)
         db.commit()
         db.refresh(website)
@@ -45,6 +51,10 @@ class WebsiteRepository:
         website = db.query(Website).filter(Website.id == website_id).first()
         if website:
             website.status = status
+            if website.total_pages is None:
+                website.total_pages = 0
+            if website.total_chunks is None:
+                website.total_chunks = 0
             website.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(website)

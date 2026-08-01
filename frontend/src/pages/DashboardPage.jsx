@@ -35,7 +35,9 @@ export default function DashboardPage() {
       setShowForm(false);
       fetchWebsites();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to add website');
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail[0]?.msg : 'Failed to add website');
+      setError(msg || 'Failed to add website');
     }
   };
 
