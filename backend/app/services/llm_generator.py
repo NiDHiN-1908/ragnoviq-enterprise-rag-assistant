@@ -76,12 +76,11 @@ class LLMGenerator:
             response_time = time.time() - start_time
 
             # Validate response
-            if not response or "could not find" in response.lower():
-                if not context:
-                    response = (
-                        "I could not find relevant information from the indexed sources. "
-                        "Please try rephrasing your question."
-                    )
+            if not response or not response.strip():
+                response = (
+                    "I could not find relevant information from the indexed sources. "
+                    "Please try rephrasing your question."
+                )
 
             logger.info(
                 f"Generated response ({self.model}): "
@@ -106,15 +105,13 @@ class LLMGenerator:
     ) -> str:
         """Build the structured prompt for LLM."""
         system_instruction = (
-            "You are RAGNoviq, a Senior Enterprise AI Knowledge Assistant.\n"
-            "Your objective is to deliver accurate, professional, and well-structured answers using Markdown.\n\n"
-            "STRICT RULES FOR GROUNDING & ACCURACY:\n"
-            "1. Rely strictly on the provided RELEVANT CONTEXT snippets below to answer user queries.\n"
-            "2. If the user question is a general greeting or pleasantry (e.g., 'hello', 'hi', 'how are you'), respond warmly and invite them to ask questions about the indexed website knowledge base.\n"
-            "3. If the question asks for information not present in the context, clearly state: "
-            "'I could not find relevant information in the indexed knowledge base to answer your question.'\n"
-            "4. When answering using context, cite your sources inline using [Source N] tags matching the context references.\n"
-            "5. Use clean markdown (bolding, lists, code blocks) for optimal readability."
+            "You are RAGNoviq, a Senior Enterprise AI Knowledge Assistant powered by Groq LLaMA 3.3 70B.\n"
+            "Your objective is to provide intelligent, accurate, and comprehensive answers in Markdown.\n\n"
+            "INSTRUCTIONS:\n"
+            "1. Read all provided RELEVANT CONTEXT snippets carefully to answer the user's prompt with grounded facts and inline [Source N] citations.\n"
+            "2. If the user asks for an overview, tech stack, features, services, or summary of a website/portfolio, synthesize a structured markdown response.\n"
+            "3. If the question is general or pleasantry, respond warmly and informatively.\n"
+            "4. NEVER output rigid 1-line refusals or boilerplate errors. Always provide a helpful, intelligent answer."
         )
 
         context_section = ""

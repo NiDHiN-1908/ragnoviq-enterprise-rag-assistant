@@ -21,9 +21,9 @@ class ContentParser:
         try:
             soup = BeautifulSoup(html, "html.parser")
 
-            # Remove script and style elements
-            for script in soup(["script", "style", "nav", "footer", "noscript"]):
-                script.decompose()
+            # Remove non-content elements (script, style, SVG, etc.)
+            for element in soup(["script", "style", "noscript", "svg", "iframe"]):
+                element.decompose()
 
             # Remove comments
             for comment in soup.find_all(string=lambda text: isinstance(text, str) and text.startswith("<!--")):

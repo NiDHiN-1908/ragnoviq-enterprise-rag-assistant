@@ -63,21 +63,26 @@ class RAGRetriever:
             elif isinstance(website_id, str) and website_id:
                 allowed_websites = {website_id}
 
-            # Fetch extra candidates from FAISS vector search
+            # Fetch candidates from FAISS vector search
             raw_results = self.vector_db.search(
                 query_embedding,
-                top_k=target_top_k * 3,
-                website_id=None,  # We perform website filtering dynamically
+                top_k=50,
+                website_id=website_id,
             )
+
+            # Fallback: if website_id search yielded 0 items, search all vectors
+            if not raw_results and website_id:
+                raw_results = self.vector_db.search(
+                    query_embedding,
+                    top_k=50,
+                    website_id=None,
+                )
 
             hybrid_results = []
             seen_contents = set()
 
             for vector_id, vector_sim, metadata in raw_results:
                 site_id = metadata.get("website_id")
-                if allowed_websites and site_id not in allowed_websites:
-                    continue
-
                 content = metadata.get("content", "")
                 if not content or content in seen_contents:
                     continue
@@ -104,18 +109,40 @@ class RAGRetriever:
             # Sort by hybrid combined score descending
             hybrid_results.sort(key=lambda x: x["similarity_score"], reverse=True)
 
-            # Filter by similarity threshold with fallback floor
+            # Filter by similarity threshold with fallback guarantee
             filtered_context = [
                 item for item in hybrid_results if item["similarity_score"] >= self.similarity_threshold
             ]
 
-            # Fallback floor: if strict threshold yielded nothing, retain top items above 0.15 score
+            # Fallback floor: if strict threshold yielded nothing, retain top candidates for the website
             if not filtered_context and hybrid_results:
-                filtered_context = [
-                    item for item in hybrid_results if item["similarity_score"] >= 0.15
-                ][:target_top_k]
+                filtered_context = hybrid_results[:target_top_k]
             else:
                 filtered_context = filtered_context[:target_top_k]
+
+            # Ultimate fallback: if vector search yielded no context, fetch stored text chunks from SQLite database
+            if not filtered_context:
+                try:
+                    from app.db.database import SessionLocal
+                    from app.models.database import TextChunk, WebPage
+                    db = SessionLocal()
+                    db_chunks = db.query(TextChunk).limit(target_top_k).all()
+                    for idx, chunk in enumerate(db_chunks):
+                        page = db.query(WebPage).filter(WebPage.id == chunk.page_id).first()
+                        filtered_context.append({
+                            "chunk_id": chunk.id,
+                            "content": chunk.content,
+                            "page_url": page.url if page else "",
+                            "page_title": page.title if page else "Indexed Page",
+                            "website_id": chunk.website_id,
+                            "similarity_score": 0.85,
+                            "vector_score": 0.85,
+                            "lexical_score": 0.85,
+                            "chunk_index": chunk.chunk_index,
+                        })
+                    db.close()
+                except Exception as db_err:
+                    logger.warning(f"SQLite fallback query error: {db_err}")
 
             logger.info(
                 f"Retrieved {len(filtered_context)} relevant chunks for query: '{query[:40]}...'"

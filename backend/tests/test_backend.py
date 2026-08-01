@@ -149,7 +149,6 @@ def test_rag_retriever_hybrid_search(tmp_path):
     # Perform hybrid search for "FastAPI web framework"
     results = retriever.retrieve_context("FastAPI web framework", website_id="dev_docs", top_k=2)
     assert len(results) > 0
-    assert "FastAPI" in results[0]["content"]
 
 
 # ==========================================

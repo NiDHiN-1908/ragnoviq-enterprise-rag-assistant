@@ -161,8 +161,8 @@ class WebCrawler:
         Remove scripts, styles, and navigation elements.
         """
         # Remove script and style elements
-        for script in soup(["script", "style", "nav", "footer"]):
-            script.decompose()
+        for element in soup(["script", "style", "noscript", "svg", "iframe"]):
+            element.decompose()
 
         # Get text
         text = soup.get_text()

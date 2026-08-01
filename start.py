@@ -16,37 +16,37 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent.resolve()
 
 
+def get_python_executable():
+    conda_python = ROOT_DIR / ".conda" / "python.exe"
+    if conda_python.exists():
+        try:
+            res = subprocess.run([str(conda_python), "-c", "import uvicorn"], capture_output=True)
+            if res.returncode == 0:
+                return str(conda_python)
+        except Exception:
+            pass
+    return sys.executable
+
+
 def main():
     print("=" * 60)
     print("🚀 Starting RAGNoviq Enterprise AI Chatbot...")
     print("=" * 60)
 
-    # Auto-detect project local .conda environment if present
-    conda_python = ROOT_DIR / ".conda" / "python.exe"
-    python_bin = str(conda_python) if conda_python.exists() else sys.executable
+    python_bin = get_python_executable()
 
     use_shell = os.name == "nt"
 
     # 1. Start Backend
-    backend_dir = ROOT_DIR / "backend"
     print("\n📦 Launching FastAPI Backend on http://localhost:8000 ...")
-    backend_cmd = [
-        python_bin,
-        "-m",
-        "uvicorn",
-        "app.main:app",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "8000",
-        "--reload",
-    ]
-    backend_process = subprocess.Popen(backend_cmd, cwd=str(backend_dir), shell=use_shell)
+    backend_cmd = f'"{python_bin}" "{ROOT_DIR / "run_backend.py"}"'
+    backend_process = subprocess.Popen(backend_cmd, cwd=str(ROOT_DIR), shell=True)
 
     # 2. Start Frontend
     frontend_dir = ROOT_DIR / "frontend"
     print("💻 Launching React Vite Frontend...")
-    frontend_process = subprocess.Popen(["npm", "run", "dev"], cwd=str(frontend_dir), shell=use_shell)
+    frontend_cmd = "npm run dev"
+    frontend_process = subprocess.Popen(frontend_cmd, cwd=str(frontend_dir), shell=True)
 
     # 3. Wait and open browser
     print("\n⏳ Initializing services...")

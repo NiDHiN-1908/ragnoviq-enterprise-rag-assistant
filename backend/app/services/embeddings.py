@@ -55,13 +55,15 @@ class EmbeddingGenerator:
         """
         try:
             if not text or not text.strip():
-                return np.zeros(self.embedding_dim)
+                return self._fallback_embedding("empty")
 
-            if self.model is None:
-                return self._fallback_embedding(text)
+            if self.model is not None:
+                try:
+                    return self.model.encode(text, convert_to_numpy=True)
+                except Exception as e:
+                    logger.warning(f"Model encode failed: {str(e)}. Using fallback feature embedding.")
 
-            embedding = self.model.encode(text, convert_to_numpy=True)
-            return embedding
+            return self._fallback_embedding(text)
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")
             return self._fallback_embedding(text)
@@ -76,25 +78,24 @@ class EmbeddingGenerator:
             if not texts:
                 return []
 
-            if self.model is None:
-                return [self._fallback_embedding(t) for t in texts]
+            if self.model is not None:
+                try:
+                    non_empty_texts = [t for t in texts if t and t.strip()]
+                    if non_empty_texts:
+                        embeddings = self.model.encode(
+                            non_empty_texts,
+                            batch_size=batch_size,
+                            convert_to_numpy=True,
+                            show_progress_bar=False,
+                        )
+                        return list(embeddings)
+                except Exception as e:
+                    logger.warning(f"Batch encode failed ({str(e)}). Using fallback feature embeddings.")
 
-            non_empty_texts = [t for t in texts if t and t.strip()]
-            if not non_empty_texts:
-                return [np.zeros(self.embedding_dim) for _ in texts]
-
-            # Generate embeddings with batching
-            embeddings = self.model.encode(
-                non_empty_texts,
-                batch_size=batch_size,
-                convert_to_numpy=True,
-                show_progress_bar=False,
-            )
-
-            return embeddings
+            return [self._fallback_embedding(t) for t in texts]
         except Exception as e:
             logger.error(f"Error generating batch embeddings: {str(e)}")
-            return [np.zeros(self.embedding_dim) for _ in texts]
+            return [self._fallback_embedding(t) for t in texts]
 
     def similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
