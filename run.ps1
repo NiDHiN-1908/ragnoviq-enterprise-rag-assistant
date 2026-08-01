@@ -14,8 +14,8 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$Sc
 
 # Wait and Open Browser
 Start-Sleep -Seconds 3
-Start-Process "http://localhost:5173"
+Start-Process "http://localhost:3000"
 
 Write-Host "✅ Backend & Frontend servers launched!" -ForegroundColor Green
-Write-Host "   • UI: http://localhost:5173" -ForegroundColor Yellow
+Write-Host "   • UI: http://localhost:3000" -ForegroundColor Yellow
 Write-Host "   • API Docs: http://localhost:8000/docs" -ForegroundColor Yellow
