@@ -257,3 +257,22 @@ def test_chat_query_and_clear_session_endpoint():
     assert del_res.status_code == 200
     del_data = del_res.json()
     assert del_data["deleted_count"] >= 1
+
+
+def test_ingest_website_normalization_and_reindex():
+    # Test website submission with bare domain (missing https://)
+    res = client.post("/api/v1/ingest/website", json={
+        "url": "example.com"
+    })
+    assert res.status_code == 202
+    data = res.json()
+    assert data["url"] == "https://example.com"
+
+    # Test re-submitting same website
+    re_res = client.post("/api/v1/ingest/website", json={
+        "url": "https://example.com"
+    })
+    assert re_res.status_code == 202
+    re_data = re_res.json()
+    assert re_data["id"] == data["id"]
+

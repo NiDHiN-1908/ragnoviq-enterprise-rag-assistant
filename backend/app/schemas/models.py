@@ -2,7 +2,7 @@
 Pydantic schemas for API request/response validation.
 """
 
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -13,8 +13,18 @@ from datetime import datetime
 
 class WebsiteCreate(BaseModel):
     """Schema for creating a new website indexing task."""
-    url: HttpUrl = Field(..., description="Website URL to crawl and index")
+    url: str = Field(..., description="Website URL to crawl and index")
     title: Optional[str] = Field(None, description="Custom title for the website")
+
+    @field_validator("url")
+    @classmethod
+    def normalize_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("URL cannot be empty")
+        if not v.startswith("http://") and not v.startswith("https://"):
+            v = "https://" + v
+        return v.rstrip("/")
 
 
 class WebsiteResponse(BaseModel):

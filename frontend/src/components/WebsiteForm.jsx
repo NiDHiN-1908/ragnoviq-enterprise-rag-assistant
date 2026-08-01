@@ -10,14 +10,18 @@ export default function WebsiteForm({ onSubmit, onCancel }) {
     e.preventDefault();
     setError(null);
 
-    if (!url.trim()) {
+    let targetUrl = url.trim();
+    if (!targetUrl) {
       setError('Please enter a valid URL');
       return;
+    }
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
     }
 
     try {
       setLoading(true);
-      await onSubmit(url);
+      await onSubmit(targetUrl);
     } catch (err) {
       setError(err.message || 'Failed to add website');
     } finally {
@@ -37,10 +41,10 @@ export default function WebsiteForm({ onSubmit, onCancel }) {
       <div>
         <label className="block text-sm font-medium mb-2">Website URL</label>
         <input
-          type="url"
+          type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example.com"
+          placeholder="https://example.com or example.com"
           disabled={loading}
           className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50"
         />

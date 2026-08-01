@@ -27,7 +27,7 @@ class WebCrawler:
         self.timeout = settings.request_timeout
 
     def _create_session(self) -> requests.Session:
-        """Create requests session with retry strategy."""
+        """Create requests session with retry strategy and modern browser headers."""
         session = requests.Session()
         retry_strategy = Retry(
             total=3,
@@ -38,17 +38,19 @@ class WebCrawler:
         adapter = HTTPAdapter(max_retries=retry_strategy)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
-        session.headers.update({"User-Agent": settings.user_agent})
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        })
         return session
 
     def _is_valid_url(self, url: str, base_domain: str) -> bool:
         """Check if URL is valid and belongs to same domain."""
         try:
             parsed = urlparse(url)
-            # Skip non-http protocols
             if parsed.scheme not in ["http", "https"]:
                 return False
-            # Check domain
             url_domain = parsed.netloc.lower()
             return url_domain == base_domain or url_domain.endswith(f".{base_domain}")
         except Exception:
@@ -57,7 +59,7 @@ class WebCrawler:
     def _normalize_url(self, url: str) -> str:
         """Normalize URL by removing fragments and trailing slashes."""
         parsed = urlparse(url)
-        normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{parsed.query}".rstrip("?")
+        normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{parsed.query}".rstrip("?").rstrip("/")
         return normalized
 
     def _extract_links(self, html: str, base_url: str) -> List[str]:
@@ -68,7 +70,7 @@ class WebCrawler:
 
         for link in soup.find_all("a", href=True):
             url = link["href"].strip()
-            if not url or url.startswith("#"):
+            if not url or url.startswith("#") or url.startswith("javascript:"):
                 continue
 
             absolute_url = urljoin(base_url, url)
@@ -86,6 +88,9 @@ class WebCrawler:
         Returns:
             List of crawled pages with URL and content
         """
+        if not start_url.startswith("http://") and not start_url.startswith("https://"):
+            start_url = "https://" + start_url
+
         self.visited_urls.clear()
         pages = []
         to_crawl = [start_url]
@@ -99,11 +104,17 @@ class WebCrawler:
 
             try:
                 logger.info(f"Crawling: {url}")
-                response = self.session.get(
-                    url, timeout=self.timeout, allow_redirects=True
-                )
-                response.raise_for_status()
+                try:
+                    response = self.session.get(
+                        url, timeout=self.timeout, allow_redirects=True
+                    )
+                except requests.exceptions.SSLError:
+                    logger.warning(f"SSL verification failed for {url}. Retrying with verify=False")
+                    response = self.session.get(
+                        url, timeout=self.timeout, allow_redirects=True, verify=False
+                    )
 
+                response.raise_for_status()
                 self.visited_urls.add(url)
 
                 # Parse content
@@ -111,8 +122,10 @@ class WebCrawler:
                 
                 # Extract title
                 title = None
-                if soup.title:
-                    title = soup.title.string
+                if soup.title and soup.title.string:
+                    title = soup.title.string.strip()
+                if not title:
+                    title = base_domain.replace("www.", "").capitalize()
 
                 # Extract main content
                 content = self._extract_text(soup)
@@ -127,7 +140,9 @@ class WebCrawler:
 
                 # Extract and queue new links
                 links = self._extract_links(response.text, url)
-                to_crawl.extend(links[:10])  # Limit links per page
+                for l in links[:15]:
+                    if l not in to_crawl:
+                        to_crawl.append(l)
 
             except requests.RequestException as e:
                 logger.warning(f"Failed to crawl {url}: {str(e)}")
@@ -136,7 +151,7 @@ class WebCrawler:
                 logger.error(f"Error crawling {url}: {str(e)}")
                 self.visited_urls.add(url)
 
-        logger.info(f"Crawl complete. Visited {len(self.visited_urls)} pages")
+        logger.info(f"Crawl complete. Visited {len(self.visited_urls)} pages, collected {len(pages)} pages.")
         return pages
 
     @staticmethod

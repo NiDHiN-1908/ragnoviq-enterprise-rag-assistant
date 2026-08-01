@@ -35,19 +35,15 @@ async def ingest_website(
         url_str = str(website.url)
         existing = WebsiteRepository.get_by_url(db, url_str)
         if existing:
-            if existing.status == "indexed":
-                raise HTTPException(
-                    status_code=409,
-                    detail="Website already indexed.",
-                )
-            target_website = existing
+            # Reset status to pending for re-indexing
+            target_website = WebsiteRepository.update_status(db, existing.id, "pending")
         else:
             # Create website record
             target_website = WebsiteRepository.create(
                 db, url=url_str, title=website.title
             )
 
-        # Queue ingestion pipeline by website ID to prevent duplicate lookup race conditions
+        # Queue background processing
         background_tasks.add_task(
             pipeline.process_website_by_id, target_website.id
         )
